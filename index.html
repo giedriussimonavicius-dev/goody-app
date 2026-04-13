@@ -240,6 +240,19 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
 .nav-dot{width:4px;height:4px;border-radius:50%;background:var(--green);margin-top:1px;display:none;}
 .nav-btn.on .nav-dot{display:block;}
 
+
+.confetti-wrap{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:200;}
+.conf{position:absolute;width:8px;height:8px;border-radius:2px;animation:confFall linear forwards;}
+@keyframes confFall{0%{transform:translateY(-20px) rotate(0);opacity:1;}100%{transform:translateY(110vh) rotate(540deg);opacity:0;}}
+.save-toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%) scale(0.8);background:var(--green);color:#0A0F1E;padding:12px 24px;border-radius:40px;font-size:15px;font-weight:800;opacity:0;transition:all 0.3s;pointer-events:none;white-space:nowrap;z-index:150;}
+.save-toast.on{opacity:1;transform:translateX(-50%) scale(1);}
+.share-btn{display:inline-flex;align-items:center;gap:6px;background:var(--green-l);border:1px solid var(--green-m);border-radius:var(--r-sm);padding:8px 16px;font-family:var(--ff);font-size:13px;font-weight:700;color:var(--green);cursor:pointer;margin-top:10px;}
+.translate-bar{display:flex;align-items:center;gap:8px;padding:10px 22px;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;}
+.translate-label{font-size:12px;color:var(--ink3);font-weight:600;}
+.lang-btn{padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--ink2);font-family:var(--ff);font-size:12px;font-weight:700;cursor:pointer;transition:all var(--dur);}
+.lang-btn.on{background:var(--green-l);border-color:var(--green);color:var(--green);}
+.last-checked{font-size:11px;color:var(--ink3);text-align:center;padding:6px 0 2px;}
+
 /* ── ERROR / TOAST ── */
 .error-card{background:var(--red-l);border:1px solid rgba(255,77,106,0.2);border-radius:var(--r-lg);padding:18px;margin-bottom:16px;text-align:center;}
 .error-ico{font-size:36px;margin-bottom:10px;}
@@ -403,6 +416,17 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
 
   <input type="file" id="fu" accept="image/*" onchange="handleUpload(event)" style="display:none">
   <div class="toast" id="toast"></div>
+  <div class="save-toast" id="save-toast"></div>
+  <div class="confetti-wrap" id="confetti-wrap"></div>
+
+
+  <div class="translate-bar">
+    <span class="translate-label">Language:</span>
+    <button class="lang-btn on" id="lang-en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" id="lang-lt" onclick="setLang('lt')">LT</button>
+    <button class="lang-btn" id="lang-de" onclick="setLang('de')">DE</button>
+    <button class="lang-btn" id="lang-pl" onclick="setLang('pl')">PL</button>
+  </div>
 
   <!-- NAV -->
   <nav class="bottom-nav">
@@ -431,7 +455,7 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
 
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <script>
-const API_BASE = "https://smartshop-backend-8b2e.onrender.com";
+const API_BASE = "https://goody-backend.onrender.com";
 
 const CATS = [
   {ic:"📱",n:"Phones",q:"iPhone 16 Pro"},
@@ -451,7 +475,7 @@ let lastData=null, lastQ="";
 
 /* ── BOOT ── */
 window.addEventListener("DOMContentLoaded",()=>{
-  buildCats(); buildRecent(); buildSaved();
+  setLang(curLang); buildCats(); buildRecent(); buildSaved();
   document.getElementById("be-url").textContent=API_BASE;
   const tick=()=>{const d=new Date();document.getElementById("clk").textContent=d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");};
   tick(); setInterval(tick,30000);
@@ -515,9 +539,10 @@ async function doSearch(){
   navTo("results");
   document.getElementById("res-title").textContent=q;
   document.getElementById("res-meta").textContent="Searching...";
-  document.getElementById("res-body").innerHTML=`<div class="loading-wrap"><div class="ldots"><div class="ldot"></div><div class="ldot"></div><div class="ldot"></div></div><div class="loading-text">Hunting for prices...</div></div>`;
+  const loadTimer = showLoading();
   try{
     const r=await fetch(`${API_BASE}/api/search`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q})});
+    clearInterval(loadTimer);
     if(!r.ok){const e=await r.json();throw new Error(e.message||"Server error");}
     const d=await r.json();
     lastData=d;
@@ -546,8 +571,10 @@ function addToHist(q,d){
 
 function renderResults(d,q){
   const results=d.results||[];
+  const now=new Date();
+  const timeStr=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   document.getElementById("res-title").textContent=d.product_name||q;
-  document.getElementById("res-meta").textContent=results.length?" "+results.length+" shops found · just now":"No results";
+  document.getElementById("res-meta").textContent=results.length?results.length+" shops · checked "+timeStr:"No results";
   let html="";
 
   if(d.ai_verdict){
@@ -566,7 +593,9 @@ function renderResults(d,q){
 
   if(results.length>1&&d.price_min&&d.price_max&&d.price_max>d.price_min){
     const sv=(d.price_max-d.price_min).toFixed(2);
-    html+=`<div class="savings-pill fade-up"><div class="sp-label">You save vs highest</div><div class="sp-amount">€${sv}</div></div>`;
+    const t=getLang();
+    html+=`<div class="savings-pill fade-up"><div class="sp-label">${t.you_save}</div><div class="sp-amount">€${sv}</div></div>`;
+    if(parseFloat(sv)>5)setTimeout(()=>fireConfetti(sv),600);
   }
 
   if(!results.length){
@@ -588,7 +617,8 @@ function renderResults(d,q){
         rating=`<div class="pc-rating">${dots}<span class="rc">${r.rating.toFixed(1)}${r.review_count>0?" · "+r.review_count.toLocaleString():""}</span></div>`;
       }
       const delivery=humanDelivery(r.delivery);
-      const btnLabel=best?"Buy now →":"View →";
+      const t2=getLang();
+      const btnLabel=best?t2.buy_now:t2.view;
       const btnClass=best?"buy-link":"view-link";
       html+=`<div class="p-card${best?" best":""} fade-up" style="animation-delay:${i*0.06}s">
         ${best?'<div class="p-card-shimmer"></div>':""}
@@ -798,6 +828,159 @@ async function runScan(){
     btn.innerHTML="<span>🔍</span><span>Analyze with AI →</span>";btn.onclick=()=>snapOrSearch();
     toast("Error: "+e.message);
   }
+}
+
+
+/* ── LANGUAGE ── */
+const LANGS = {
+  en: {
+    scan_hint:"Point camera at any price tag",
+    search_placeholder:"Search any product...",
+    enable_camera:"Enable camera",
+    take_photo:"Take photo",
+    analyzing:"Analyzing...",
+    hunting:"Hunting for prices...",
+    saved_empty:"Nothing saved yet — go find a deal! 👀",
+    ai_verdict:"AI verdict",
+    you_save:"You save vs highest",
+    buy_now:"Buy now →",
+    view:"View →",
+    categories:"Categories",
+    recent:"Recent",
+    no_recent:"No recent searches",
+    settings:"Settings",
+    saved:"Saved",
+    scan:"Scan",
+    search:"Search",
+    home:"Home",
+    tomorrow:"Tomorrow",
+    today:"Today",
+    in_store:"In store",
+    loading_msgs:["Hunting for prices...","Checking Amazon...","Almost there..."],
+  },
+  lt: {
+    scan_hint:"Nukreipk kamerą į kainoraštį",
+    search_placeholder:"Ieškoti produkto...",
+    enable_camera:"Įjungti kamerą",
+    take_photo:"Fotografuoti",
+    analyzing:"Analizuojama...",
+    hunting:"Ieškoma kainų...",
+    saved_empty:"Nieko neišsaugota — eik rasti sandorį! 👀",
+    ai_verdict:"AI verdiktas",
+    you_save:"Sutaupi lyginant su brangiausia",
+    buy_now:"Pirkti →",
+    view:"Peržiūrėti →",
+    categories:"Kategorijos",
+    recent:"Neseniai",
+    no_recent:"Nėra naujausių paieškų",
+    settings:"Nustatymai",
+    saved:"Išsaugota",
+    scan:"Skanuoti",
+    search:"Ieškoti",
+    home:"Pradžia",
+    tomorrow:"Rytoj",
+    today:"Šiandien",
+    in_store:"Parduotuvėje",
+    loading_msgs:["Ieškoma kainų...","Tikrinama Amazon...","Jau beveik..."],
+  },
+  de: {
+    scan_hint:"Kamera auf Preisschild richten",
+    search_placeholder:"Produkt suchen...",
+    enable_camera:"Kamera aktivieren",
+    take_photo:"Foto aufnehmen",
+    analyzing:"Analysiere...",
+    hunting:"Preise werden gesucht...",
+    saved_empty:"Noch nichts gespeichert — finde ein Angebot! 👀",
+    ai_verdict:"KI-Urteil",
+    you_save:"Du sparst gegenüber dem höchsten",
+    buy_now:"Jetzt kaufen →",
+    view:"Ansehen →",
+    categories:"Kategorien",
+    recent:"Zuletzt",
+    no_recent:"Keine letzten Suchen",
+    settings:"Einstellungen",
+    saved:"Gespeichert",
+    scan:"Scannen",
+    search:"Suchen",
+    home:"Start",
+    tomorrow:"Morgen",
+    today:"Heute",
+    in_store:"Im Laden",
+    loading_msgs:["Preise werden gesucht...","Amazon wird geprüft...","Fast fertig..."],
+  },
+  pl: {
+    scan_hint:"Skieruj aparat na cenę",
+    search_placeholder:"Szukaj produktu...",
+    enable_camera:"Włącz kamerę",
+    take_photo:"Zrób zdjęcie",
+    analyzing:"Analizowanie...",
+    hunting:"Szukam cen...",
+    saved_empty:"Nic nie zapisano — znajdź okazję! 👀",
+    ai_verdict:"Werdykt AI",
+    you_save:"Oszczędzasz vs najdroższy",
+    buy_now:"Kup teraz →",
+    view:"Zobacz →",
+    categories:"Kategorie",
+    recent:"Ostatnie",
+    no_recent:"Brak ostatnich wyszukiwań",
+    settings:"Ustawienia",
+    saved:"Zapisane",
+    scan:"Skanuj",
+    search:"Szukaj",
+    home:"Start",
+    tomorrow:"Jutro",
+    today:"Dziś",
+    in_store:"W sklepie",
+    loading_msgs:["Szukam cen...","Sprawdzam Amazon...","Prawie gotowe..."],
+  }
+};
+let curLang = localStorage.getItem("gy_lang")||"en";
+
+function setLang(l){
+  curLang=l;
+  localStorage.setItem("gy_lang",l);
+  document.querySelectorAll(".lang-btn").forEach(b=>b.classList.remove("on"));
+  document.getElementById("lang-"+l).classList.add("on");
+  applyLang();
+}
+
+function applyLang(){
+  const t=LANGS[curLang]||LANGS.en;
+  const sh=document.querySelector(".scan-hint");if(sh)sh.textContent=t.scan_hint;
+  const si=document.getElementById("srch-inp");if(si)si.placeholder=t.search_placeholder;
+  document.querySelectorAll(".nav-lbl").forEach((el,i)=>{
+    const lbls=[t.home,t.scan,t.saved,t.settings];
+    if(lbls[i])el.textContent=lbls[i];
+  });
+  const stl=document.querySelector(".sec-title");if(stl)stl.textContent=t.categories;
+  buildRecent();
+}
+
+function getLang(){return LANGS[curLang]||LANGS.en;}
+
+/* ── CONFETTI ── */
+function fireConfetti(savings){
+  const wrap=document.getElementById("confetti-wrap");
+  wrap.innerHTML="";
+  const colors=["#00D084","#FFB830","#FF4D6A","#F8F9FA","#00B8FF"];
+  for(let i=0;i<40;i++){
+    const el=document.createElement("div");
+    el.className="conf";
+    el.style.cssText=`left:${Math.random()*100}%;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${0.8+Math.random()*1.2}s;animation-delay:${Math.random()*0.4}s;width:${6+Math.random()*6}px;height:${6+Math.random()*6}px;`;
+    wrap.appendChild(el);
+  }
+  const st=document.getElementById("save-toast");
+  st.textContent=`🎉 You save €${savings}!`;
+  st.classList.add("on");
+  setTimeout(()=>{st.classList.remove("on");wrap.innerHTML="";},3000);
+}
+
+/* ── LOADING MESSAGES ── */
+function showLoading(){
+  const msgs=getLang().loading_msgs;
+  let i=0;
+  document.getElementById("res-body").innerHTML=`<div class="loading-wrap"><div class="ldots"><div class="ldot"></div><div class="ldot"></div><div class="ldot"></div></div><div class="loading-text" id="load-txt">${msgs[0]}</div></div>`;
+  return setInterval(()=>{i=(i+1)%msgs.length;const el=document.getElementById("load-txt");if(el)el.textContent=msgs[i];},1800);
 }
 
 /* ── UTILS ── */
