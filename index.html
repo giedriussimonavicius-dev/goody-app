@@ -789,12 +789,24 @@ function renderResults(d,q){
   }
 
   if(!results.length){
-    html+=`<div class="no-results"><div class="nr-ico">🔍</div><div class="nr-title">No prices found</div><div class="nr-sub">Try a more specific product name or model number</div></div>`;
+    html+=`<div class="no-results">
+      <div class="nr-ico">🔍</div>
+      <div class="nr-title">Nothing found</div>
+      <div class="nr-sub">Could not find "<strong>${q}</strong>" in shops right now.</div>
+      <div style="text-align:left;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin:16px 0;">
+        <div style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Tips</div>
+        <div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">💡 <span>Try shorter name, e.g. "iPhone 16" not full model</span></div>
+        <div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">🏷 <span>Use brand + model, e.g. "Samsung Galaxy S24"</span></div>
+        <div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">🌐 <span>Some shops may be temporarily unavailable</span></div>
+      </div>
+      <button onclick="navTo('home')" style="width:100%;padding:14px;background:var(--green);color:#0A0F1E;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;">← Search again</button>
+    </div>`;
   } else {
     html+='<div class="price-list">';
     results.forEach((r,i)=>{
       const best=r.is_cheapest||r.is_best_value;
-      const link=r.affiliate_url||r.url||"#";
+      const link=r.affiliate_url||r.url||"";
+      const hasLink=link.startsWith("http");
       const logo=getShopLogo(r.shop);
       let badges="";
       if(r.is_cheapest)badges+=`<span class="badge b-green">Cheapest</span>`;
@@ -810,6 +822,9 @@ function renderResults(d,q){
       const t2=getLang();
       const btnLabel=best?t2.buy_now:t2.view;
       const btnClass=best?"buy-link":"view-link";
+      const btnHtml=hasLink
+        ?`<a class="${btnClass}" href="${link}" target="_blank" rel="noopener">${btnLabel}</a>`
+        :`<span style="font-size:12px;color:var(--ink3);padding:4px 8px;">No link</span>`;
       html+=`<div class="p-card${best?" best":""} fade-up" style="animation-delay:${i*0.06}s">
         ${best?'<div class="p-card-shimmer"></div>':""}
         <div class="pc-top">
@@ -824,7 +839,7 @@ function renderResults(d,q){
         </div>
         <div class="pc-bot">
           <div class="pc-badges">${badges||rating}</div>
-          <a class="${btnClass}" href="${link}" target="_blank" rel="noopener">${btnLabel}</a>
+          ${btnHtml}
         </div>
       </div>`;
     });
@@ -1035,6 +1050,14 @@ async function runScan(){
     const resp=await fetch(`${API_BASE}/api/scan-image`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:capturedB64}),signal:_sc.signal});
     clearTimeout(_st);
     const data=await resp.json();
+    // Jei produktas neatpažintas - nerodyti closeCam, rodyti klaidą kameroje
+    if(data.error==="product_not_recognized"||(!data.scanned_product&&!data.product_name&&!(data.results&&data.results.length))){
+      btn.disabled=false;btn.style.background="var(--card2)";
+      btn.innerHTML="<span>📷</span><span>Try another photo</span>";
+      btn.onclick=()=>{capturedB64=null;document.getElementById("cp-wrap").style.display="none";resetSnap();};
+      document.getElementById("cprev").innerHTML=`<div class="cprev-ic">❌</div><div><div class="cprev-l" style="color:var(--red);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">Not recognized</div><div class="cprev-v">Try a clearer photo</div><div class="cprev-s">Make sure product name is visible</div></div>`;
+      return;
+    }
     closeCam();
     if(data.results&&data.results.length>0){
       const q=data.scanned_product||data.product_name||"product";
@@ -1045,7 +1068,8 @@ async function runScan(){
       renderResults(data,q);
       navTo("results");
     } else {
-      const q=data.scanned_product||data.barcode||data.product_name||data.context||"product";
+      const q=data.scanned_product||data.barcode||data.product_name||data.context||"";
+      if(!q){toast("Could not identify product — try another photo");return;}
       document.getElementById("srch-inp").value=q;
       if(data.price_visible)toast(`Price tag: €${data.price_visible}`);
       doSearch();
