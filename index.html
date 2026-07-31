@@ -827,12 +827,6 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
 .ring:nth-child(3){width:clamp(76px,22vw,100px);height:clamp(76px,22vw,100px);}
 .cat-n{font-size:clamp(11px,2.5vw,12px);}
 
-/* ── DEAL SCORE PILL ── */
-.deal-score-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;}
-.dsp-high{background:var(--green-l);color:var(--green);}
-.dsp-mid{background:var(--amber-l);color:var(--amber);}
-.dsp-low{background:var(--red-l);color:var(--red);}
-
 /* ── CAT KEYBOARD NAV ── */
 .cat:focus-visible{outline:2px solid var(--green);outline-offset:2px;background:var(--green-l);}
 /* ── SUGGESTIONS ── */
@@ -2163,9 +2157,6 @@ function renderResults(d,q,opts){opts=opts||{};
   if(onlineResults.length>=1 && !scannedPrice){
     const _reliableBar=onlineResults.filter(r=>!r.is_suspicious&&!r.ai_filtered);
     const _hasRealComparison=_reliableBar.length>=2;
-    const shopWord={"lt":"patikimas pasiūlymas","en":"verified offer","de":"gepr. Angebot","pl":"oferta"}[lang]||"verified offer";
-    const shopsWord={"lt":"patikimi pasiūlymai","en":"verified offers","de":"gepr. Angebote","pl":"oferty"}[lang]||"verified offers";
-    const shopsLabel=_reliableBar.length===1?`1 ${shopWord}`:_reliableBar.length>1?`${_reliableBar.length} ${shopsWord}`:`${onlineResults.length} ${{"lt":"parduotuvių","en":"shops","de":"Shops","pl":"sklepów"}[lang]||"shops"}`;
     const bestLbl={"lt":"Pigiausia kaina","en":"Best price","de":"Günstigster Preis","pl":"Najlepsza cena"}[lang]||"Best price";
     if(opts._partial){
       const _shopsTotal=d._shops_total||3;
