@@ -2183,30 +2183,30 @@ function renderResults(d,q,opts){opts=opts||{};
         </div>
       </div>`;
     }else{
-      const savings=_hasRealComparison&&d.price_max>bestOnline.price?d.price_max-bestOnline.price:0;
-      const saveTxt=savings>=1?` · <span style="color:var(--green);">${{"lt":"sutaupi","en":"save","de":"sparen","pl":"oszczędzasz"}[lang]||"save"} ${money(savings)}</span>`:"";
-      const ds=Number(d.deal_score||0);
-      let dsPill="";
-      if(_hasRealComparison){
-        if(ds>=82)dsPill=`<span class="deal-score-pill dsp-high">🔥 ${ds}/100</span>`;
-        else if(ds>=60)dsPill=`<span class="deal-score-pill dsp-mid">⭐ ${ds}/100</span>`;
-        else if(ds>0)dsPill=`<span class="deal-score-pill dsp-low">${ds}/100</span>`;
-      }
-      html+=`<div id="verdict-bar" style="background:linear-gradient(135deg,rgba(39,224,138,0.12),rgba(39,224,138,0.04));border:1.5px solid rgba(39,224,138,0.28);border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;" class="fade-up">
-        <div>
-          <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${bestLbl}</div>
-          <div id="verdict-price" style="font-size:22px;font-weight:900;color:var(--green);line-height:1;">${money(bestOnline.price)}</div>
-          <div style="font-size:11px;color:var(--ink2);margin-top:2px;">${escHtml(bestOnline.shop)}${saveTxt}</div>
-        </div>
-        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-          <div style="font-size:11px;color:var(--ink3);">${shopsLabel}</div>
-          ${dsPill}
-        </div>
+      const score=d.deal_score||50;
+      if(score>=75&&navigator.vibrate)navigator.vibrate([40,20,40]);
+      const hasAI=!!(d.verdict_reason||d.buy_recommendation);
+      const dwLabel=score>=75?"🔥 GOOD DEAL":score>=50?(hasAI?"👌 FAIR DEAL":"📊 MARKET PRICE"):"⚠️ MAYBE WAIT";
+      const dwTitle=score>=75
+        ?({"lt":"Rasta gera kaina","de":"Guter Preis gefunden","pl":"Znaleziono dobrą cenę"}[lang]||"Good price found")
+        :score>=50
+          ?(hasAI
+            ?({"lt":"Kaina atrodo normali","de":"Preis sieht fair aus","pl":"Cena wygląda normalnie"}[lang]||"Price looks fair")
+            :({"lt":"Rasta kaina","de":"Preise gefunden","pl":"Znaleziono ceny"}[lang]||"Prices found"))
+          :({"lt":"Kaina neatrodo ypatinga","de":"Preis ist nicht außergewöhnlich","pl":"Cena nie jest wyjątkowa"}[lang]||"Price is not exceptional");
+      const dwSub=escHtml(d.verdict_reason||d.buy_recommendation||({"lt":"Palyginome kainas iš kelių parduotuvių.","de":"Wir haben Preise aus mehreren Shops verglichen.","pl":"Porównaliśmy ceny z kilku sklepów."}[lang]||"We compared prices across shops."));
+      const dwCls=score>=75?"":score>=50?"warn":"bad";
+      const nOffersDw=onlineResults.length||results.length;
+      const offersLblDw={"lt":nOffersDw===1?"pasiūlymas":"pasiūlymai","de":nOffersDw===1?"Angebot":"Angebote","pl":nOffersDw===1?"oferta":"oferty"}[lang]||"offers";
+      const _dwPrice=bestOnline?bestOnline.price:(d.price_min||0);
+      const _dwShop=bestOnline?escHtml(bestOnline.shop):"";
+      html+=`<div class="deal-win-card ${dwCls} fade-up" id="verdict-bar">
+        <div class="deal-badge">${dwLabel}</div>
+        <div class="deal-title">${dwTitle}</div>
+        ${_dwPrice>0?`<div class="deal-hero" id="verdict-price">${money(_dwPrice)}</div><div style="font-size:12px;color:var(--ink2);margin:-4px 0 8px;">${_dwShop}</div>`:""}
+        <div class="deal-sub">${dwSub}</div>
+        <div class="mini-score"><span class="mini-score-pill">${nOffersDw} ${offersLblDw}</span></div>
       </div>`;
-      if(!_hasRealComparison){
-        const coverageNote={"lt":"1 patikimas pasiūlymas — kitos kainos gali būti priedai","en":"1 verified offer — other prices may be accessories","de":"1 gepr. Angebot — andere könnten Zubehör sein","pl":"1 zweryfikowana oferta — inne ceny mogą być akcesoriami"}[lang]||"1 verified offer found";
-        html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r-sm);margin-bottom:10px;font-size:11px;color:var(--ink3);">ℹ️ ${coverageNote}</div>`;
-      }
     }
   }
 
@@ -2443,31 +2443,6 @@ function renderResults(d,q,opts){opts=opts||{};
           <div class="deal-metric"><div class="deal-metric-label">${_sc.online_lbl}</div><div class="deal-metric-value" style="color:${bestColor}">${money(bestOnline.price)}</div></div>
         </div>
         <div class="deal-proof">${proof}</div>
-      </div>`;
-    }else{
-      const score=d.deal_score||50;
-      if(score>=75&&navigator.vibrate)navigator.vibrate([40,20,40]);
-      const hasAI=!!(d.verdict_reason||d.buy_recommendation);
-      const label=score>=75?"🔥 GOOD DEAL":score>=50?(hasAI?"👌 FAIR DEAL":"📊 MARKET PRICE"):"⚠️ MAYBE WAIT";
-      const title=score>=75
-        ?({"lt":"Rasta gera kaina","de":"Guter Preis gefunden","pl":"Znaleziono dobrą cenę"}[lang]||"Good price found")
-        :score>=50
-          ?(hasAI
-            ?({"lt":"Kaina atrodo normali","de":"Preis sieht fair aus","pl":"Cena wygląda normalnie"}[lang]||"Price looks fair")
-            :({"lt":"Rasta kaina","de":"Preise gefunden","pl":"Znaleziono ceny"}[lang]||"Prices found"))
-          :({"lt":"Kaina neatrodo ypatinga","de":"Preis ist nicht außergewöhnlich","pl":"Cena nie jest wyjątkowa"}[lang]||"Price is not exceptional");
-      const sub=escHtml(d.verdict_reason||d.buy_recommendation||({"lt":"Palyginome kainas iš kelių parduotuvių.","de":"Wir haben Preise aus mehreren Shops verglichen.","pl":"Porównaliśmy ceny z kilku sklepów."}[lang]||"We compared prices across shops."));
-      const cardCls=score>=75?"":score>=50?"warn":"bad";
-      const nOffers=onlineResults.length||results.length;
-      const offersLbl={"lt":nOffers===1?"pasiūlymas":"pasiūlymai","de":nOffers===1?"Angebot":"Angebote","pl":nOffers===1?"oferta":"oferty"}[lang]||"offers";
-      const _bestCardPrice=bestOnline?bestOnline.price:(d.price_min||0);
-      const _bestCardShop=bestOnline?escHtml(bestOnline.shop):"";
-      html+=`<div class="deal-win-card ${cardCls} fade-up">
-        <div class="deal-badge">${label}</div>
-        <div class="deal-title">${title}</div>
-        ${_bestCardPrice>0?`<div class="deal-hero">${money(_bestCardPrice)}</div><div style="font-size:12px;color:var(--ink2);margin:-4px 0 8px;">${_bestCardShop}</div>`:""}
-        <div class="deal-sub">${sub}</div>
-        <div class="mini-score"><span class="mini-score-pill">${nOffers} ${offersLbl}</span></div>
       </div>`;
     }
     if(_identifyResult&&_identifyResult.key_specs&&_searchSource==='scan'){
