@@ -2200,10 +2200,12 @@ function renderResults(d,q,opts){opts=opts||{};
       const offersLblDw={"lt":nOffersDw===1?"pasiūlymas":"pasiūlymai","de":nOffersDw===1?"Angebot":"Angebote","pl":nOffersDw===1?"oferta":"oferty"}[lang]||"offers";
       const _dwPrice=bestOnline?bestOnline.price:(d.price_min||0);
       const _dwShop=bestOnline?escHtml(bestOnline.shop):"";
+      const _dwSavings=_hasRealComparison&&d.price_max>_dwPrice?d.price_max-_dwPrice:0;
+      const _dwSaveTxt=_dwSavings>=1?`<span style="color:var(--green);font-weight:700;"> · ${{"lt":"sutaupai","de":"sparen","pl":"oszczędzasz"}[lang]||"save"} ${money(_dwSavings)}</span>`:"";
       html+=`<div class="deal-win-card ${dwCls} fade-up" id="verdict-bar">
         <div class="deal-badge">${dwLabel}</div>
         <div class="deal-title">${dwTitle}</div>
-        ${_dwPrice>0?`<div class="deal-hero" id="verdict-price">${money(_dwPrice)}</div><div style="font-size:12px;color:var(--ink2);margin:-4px 0 8px;">${_dwShop}</div>`:""}
+        ${_dwPrice>0?`<div class="deal-hero" id="verdict-price">${money(_dwPrice)}</div><div style="font-size:12px;color:var(--ink2);margin:-4px 0 8px;">${_dwShop}${_dwSaveTxt}</div>`:""}
         <div class="deal-sub">${dwSub}</div>
         <div class="mini-score"><span class="mini-score-pill">${nOffersDw} ${offersLblDw}</span></div>
       </div>`;
