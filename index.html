@@ -682,33 +682,6 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
 .fade-up{animation:fadeUp 0.38s cubic-bezier(0.22,1,0.36,1) both;}
 
-/* ── BACK-TO-GOODY PILL (top-left, fixed, 44×44 min) ── */
-.back-banner{
-  position:fixed;top:max(52px,calc(env(safe-area-inset-top) + 44px));left:12px;
-  background:linear-gradient(180deg,#33E89A 0%,#27E08A 100%);color:#0A0F18;
-  padding:10px 16px;display:inline-flex;align-items:center;gap:9px;
-  z-index:550;
-  font-size:14px;font-weight:700;font-family:var(--ff);letter-spacing:-0.1px;
-  min-height:44px;border:none;border-radius:14px;
-  transform:translateX(-130%);transition:transform 0.38s cubic-bezier(0.16,1,0.3,1);
-  box-shadow:0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(39,224,138,0.25);
-  cursor:pointer;
-  max-width:calc(100% - 24px);
-}
-.back-banner:hover{transform:translateX(0) scale(1.02);}
-.back-banner:active{transform:translateX(0) scale(0.97);}
-.back-banner.show{transform:translateX(0);}
-.bb-arrow{font-size:18px;font-weight:900;flex-shrink:0;line-height:1;}
-.bb-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
-.bb-close{
-  background:rgba(0,0,0,0.18);border:none;font-size:13px;line-height:1;cursor:pointer;
-  color:#0A0F18;font-weight:900;width:24px;height:24px;border-radius:50%;
-  flex-shrink:0;font-family:var(--ff);
-  display:flex;align-items:center;justify-content:center;
-  margin-left:4px;
-}
-.bb-close:hover{background:rgba(0,0,0,0.28);}
-.bb-close:active{background:rgba(0,0,0,0.36);}
 
 /* PULL TO REFRESH */
 .ptr-indicator{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:300;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:var(--green);box-shadow:0 4px 20px rgba(39,224,138,.4);opacity:0;transition:opacity .2s,top .2s;pointer-events:none;}
@@ -1143,13 +1116,6 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="save-toast" id="save-toast"></div>
   <div class="confetti-wrap" id="confetti-wrap"></div>
-
-  <!-- BACK-TO-GOODY PILL: shown when user returns from external shop tab -->
-  <div class="back-banner" id="back-banner" role="alert" aria-live="assertive" onclick="backBannerReturn(event)">
-    <span class="bb-arrow" aria-hidden="true">←</span>
-    <span class="bb-text" id="back-banner-txt">Atgal į Goody</span>
-    <button class="bb-close" onclick="event.stopPropagation();hideBackBanner()" aria-label="Close">✕</button>
-  </div>
 
   <!-- ONBOARDING (first visit only) -->
   <div class="onboard-overlay" id="onboard-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Welcome to Goody">
@@ -1938,45 +1904,7 @@ function trackClick(shop, q){
   try{fetch(`${API_BASE}/api/track`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({shop,q,intent_id:_currentSearchId}),keepalive:true});}catch(e){}
 }
 
-// ── RETURN FROM SHOP ──────────────────────────────────────
 let _qualityLoop=null,_qualityCount=0;
-
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState!=='visible')return;
-  try{
-    const raw=sessionStorage.getItem('gy_lastClick');
-    if(!raw)return;
-    const click=JSON.parse(raw);
-    const age=Date.now()-click.ts;
-    if(age<800||age>30*60*1000)return; // too soon or stale
-    showBackBanner(click.shop,click.q);
-  }catch(e){}
-});
-
-function showBackBanner(shop,q){
-  const banner=document.getElementById('back-banner');
-  if(!banner)return;
-  const t=LANGS[curLang]||LANGS.en;
-  const txt=document.getElementById('back-banner-txt');
-  if(txt)txt.textContent=t.back_to_goody||"Back to Goody";
-  // remember which shop the user came back from (for analytics if needed later)
-  try{banner.dataset.lastShop=shop||"";}catch(_){}
-  banner.classList.add('show');
-  // no auto-hide — stays until user taps the pill or the ✕
-}
-
-function hideBackBanner(){
-  const b=document.getElementById('back-banner');
-  if(b)b.classList.remove('show');
-}
-
-function backBannerReturn(ev){
-  // Tapping the pill returns the user to the home screen and dismisses the banner.
-  try{if(ev&&ev.target&&ev.target.classList&&ev.target.classList.contains('bb-close'))return;}catch(_){}
-  try{sessionStorage.removeItem('gy_lastClick');}catch(_){}
-  hideBackBanner();
-  if(typeof navTo==='function')navTo('home');
-}
 
 /* ── SEARCH ── */
 function _showSearchError(){
@@ -2231,39 +2159,54 @@ function renderResults(d,q,opts){opts=opts||{};
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 14px;margin-bottom:10px;font-size:12px;color:var(--ink3);">${cachedNotice}<button onclick="doSearch()" style="background:none;border:none;color:var(--green);font-family:var(--ff);font-size:12px;font-weight:700;cursor:pointer;padding:0;">${refreshLbl} →</button></div>`;
   }
 
-  // ── INSTANT VERDICT BAR (Eglė — visible without scrolling) ──
+  // ── COMPACT VERDICT BAR ──
   if(onlineResults.length>=1 && !scannedPrice){
-    // Only count reliable (non-suspicious/accessory) results for savings display
     const _reliableBar=onlineResults.filter(r=>!r.is_suspicious&&!r.ai_filtered);
     const _hasRealComparison=_reliableBar.length>=2;
-    const savings=_hasRealComparison&&d.price_max>bestOnline.price?d.price_max-bestOnline.price:0;
-    const saveTxt=savings>=1?` · <span style="color:var(--green);">${{"lt":"sutaupi","en":"save","ru":"экономия","de":"sparen","pl":"oszczędzasz"}[lang]||"save"} ${money(savings)}</span>`:"";
-    const shopCount=_reliableBar.length||onlineResults.length;
-    const shopWord={"lt":"patikimas pasiūlymas","en":"verified offer","ru":"предложение","de":"gepr. Angebot","pl":"oferta"}[lang]||"verified offer";
-    const shopsWord={"lt":"patikimi pasiūlymai","en":"verified offers","ru":"предложения","de":"gepr. Angebote","pl":"oferty"}[lang]||"verified offers";
-    const shopsLabel=_reliableBar.length===1?`1 ${shopWord}`:_reliableBar.length>1?`${_reliableBar.length} ${shopsWord}`:`${onlineResults.length} ${{"lt":"parduotuvių","en":"shops","ru":"магазинов","de":"Shops","pl":"sklepów"}[lang]||"shops"}`;
-    const bestLbl={"lt":"Pigiausia kaina","en":"Best price","ru":"Луčшая цена","de":"Günstigster Preis","pl":"Najlepsza cena"}[lang]||"Best price";
-    const ds=Number(d.deal_score||0);
-    let dsPill="";
-    if(_hasRealComparison){
-      if(ds>=82)dsPill=`<span class="deal-score-pill dsp-high">🔥 ${ds}/100</span>`;
-      else if(ds>=60)dsPill=`<span class="deal-score-pill dsp-mid">⭐ ${ds}/100</span>`;
-      else if(ds>0)dsPill=`<span class="deal-score-pill dsp-low">${ds}/100</span>`;
-    }
-    html+=`<div id="verdict-bar" style="background:linear-gradient(135deg,rgba(39,224,138,0.12),rgba(39,224,138,0.04));border:1.5px solid rgba(39,224,138,0.28);border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;" class="fade-up">
-      <div>
-        <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${bestLbl}</div>
-        <div id="verdict-price" style="font-size:22px;font-weight:900;color:var(--green);line-height:1;">${money(bestOnline.price)}</div>
-        <div style="font-size:11px;color:var(--ink2);margin-top:2px;">${escHtml(bestOnline.shop)}${saveTxt}</div>
-      </div>
-      <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <div style="font-size:11px;color:var(--ink3);">${shopsLabel}</div>
-        ${dsPill}
-      </div>
-    </div>`;
-    if(!_hasRealComparison&&!d._partial){
-      const coverageNote={"lt":"1 patikimas pasiūlymas — kitos kainos gali būti priedai","en":"1 verified offer — other prices may be accessories","ru":"1 проверенное предложение","de":"1 gepr. Angebot — andere könnten Zubehör sein","pl":"1 zweryfikowana oferta — inne ceny mogą być akcesoriami"}[lang]||"1 verified offer found";
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r-sm);margin-bottom:10px;font-size:11px;color:var(--ink3);">ℹ️ ${coverageNote}</div>`;
+    const shopWord={"lt":"patikimas pasiūlymas","en":"verified offer","de":"gepr. Angebot","pl":"oferta"}[lang]||"verified offer";
+    const shopsWord={"lt":"patikimi pasiūlymai","en":"verified offers","de":"gepr. Angebote","pl":"oferty"}[lang]||"verified offers";
+    const shopsLabel=_reliableBar.length===1?`1 ${shopWord}`:_reliableBar.length>1?`${_reliableBar.length} ${shopsWord}`:`${onlineResults.length} ${{"lt":"parduotuvių","en":"shops","de":"Shops","pl":"sklepów"}[lang]||"shops"}`;
+    const bestLbl={"lt":"Pigiausia kaina","en":"Best price","de":"Günstigster Preis","pl":"Najlepsza cena"}[lang]||"Best price";
+    if(opts._partial){
+      const _shopsTotal=d._shops_total||3;
+      const _shopsDone=d._shops_done||0;
+      const _pct=Math.round((_shopsDone/_shopsTotal)*100);
+      const _checkLbl={"lt":"Tikrinamos parduotuvės","en":"Checking shops","de":"Shops werden geprüft","pl":"Sprawdzam sklepy"}[lang]||"Checking shops";
+      html+=`<div id="verdict-bar" style="background:linear-gradient(135deg,rgba(39,224,138,0.12),rgba(39,224,138,0.04));border:1.5px solid rgba(39,224,138,0.28);border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;" class="fade-up">
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${bestLbl}</div>
+          <div id="verdict-price" style="font-size:22px;font-weight:900;color:var(--green);line-height:1;">${money(bestOnline.price)}</div>
+        </div>
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <div style="font-size:11px;color:var(--ink3);">${_checkLbl}: ${_shopsDone}/${_shopsTotal}</div>
+          <div style="width:80px;height:4px;background:rgba(39,224,138,0.18);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${_pct}%;background:var(--green);border-radius:2px;transition:width 0.4s;"></div></div>
+        </div>
+      </div>`;
+    }else{
+      const savings=_hasRealComparison&&d.price_max>bestOnline.price?d.price_max-bestOnline.price:0;
+      const saveTxt=savings>=1?` · <span style="color:var(--green);">${{"lt":"sutaupi","en":"save","de":"sparen","pl":"oszczędzasz"}[lang]||"save"} ${money(savings)}</span>`:"";
+      const ds=Number(d.deal_score||0);
+      let dsPill="";
+      if(_hasRealComparison){
+        if(ds>=82)dsPill=`<span class="deal-score-pill dsp-high">🔥 ${ds}/100</span>`;
+        else if(ds>=60)dsPill=`<span class="deal-score-pill dsp-mid">⭐ ${ds}/100</span>`;
+        else if(ds>0)dsPill=`<span class="deal-score-pill dsp-low">${ds}/100</span>`;
+      }
+      html+=`<div id="verdict-bar" style="background:linear-gradient(135deg,rgba(39,224,138,0.12),rgba(39,224,138,0.04));border:1.5px solid rgba(39,224,138,0.28);border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;" class="fade-up">
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${bestLbl}</div>
+          <div id="verdict-price" style="font-size:22px;font-weight:900;color:var(--green);line-height:1;">${money(bestOnline.price)}</div>
+          <div style="font-size:11px;color:var(--ink2);margin-top:2px;">${escHtml(bestOnline.shop)}${saveTxt}</div>
+        </div>
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <div style="font-size:11px;color:var(--ink3);">${shopsLabel}</div>
+          ${dsPill}
+        </div>
+      </div>`;
+      if(!_hasRealComparison){
+        const coverageNote={"lt":"1 patikimas pasiūlymas — kitos kainos gali būti priedai","en":"1 verified offer — other prices may be accessories","de":"1 gepr. Angebot — andere könnten Zubehör sein","pl":"1 zweryfikowana oferta — inne ceny mogą być akcesoriami"}[lang]||"1 verified offer found";
+        html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r-sm);margin-bottom:10px;font-size:11px;color:var(--ink3);">ℹ️ ${coverageNote}</div>`;
+      }
     }
   }
 
@@ -2274,129 +2217,6 @@ function renderResults(d,q,opts){opts=opts||{};
     const confText=confLabel[lang]||("Confidence: "+conf);
     const confScanned=d.scanned_product?`<span style="font-weight:700;">${escHtml(d.scanned_product)}</span> · `:"";
     html+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--r-sm);margin-bottom:8px;font-size:12px;color:var(--ink2);">${confIcon} 📷 ${confScanned}${confText}</div>`;
-  }
-
-  if(scannedPrice>1 && bestOnline){
-    const diff=scannedPrice-bestOnline.price;
-    const pct=scannedPrice>0?(diff/scannedPrice*100):0;
-    let cardCls="";
-    let badge="";
-    let title="";
-    let hero="";
-    let sub="";
-    let proof="";
-    let bestColor="var(--green)";
-
-    const _sc={
-      save:{"lt":"Sutaupoma ","de":"Gespart: ","pl":"Oszczędzasz "}[lang]||"Save ",
-      online_plus:{"lt":"Internete +","de":"Online +","pl":"Online +"}[lang]||"Online +",
-      photo_lbl:{"lt":"Kaina nuotraukoje","de":"Foto-Preis","pl":"Cena ze zdjęcia"}[lang]||"Photo price",
-      online_lbl:{"lt":"Kaina internete","de":"Online-Preis","pl":"Cena online"}[lang]||"Online price",
-    };
-    if(diff>5){
-      badge={"lt":"🌐 PIRK INTERNETE","de":"🌐 ONLINE KAUFEN","pl":"🌐 KUP ONLINE"}[lang]||"🌐 BUY ONLINE";
-      title={"lt":"Pirk internete","de":"Online kaufen","pl":"Kup online"}[lang]||"Buy online";
-      hero=_sc.save+money(diff);
-      sub=`${escHtml(bestOnline.shop)}: ${money(bestOnline.price)} · ${Math.abs(pct).toFixed(0)}% `+({"lt":"pigiau","de":"günstiger","pl":"taniej"}[lang]||"cheaper")+".";
-      proof=`${_sc.photo_lbl}: ${money(scannedPrice)}. ${_sc.online_lbl}: ${money(bestOnline.price)}.`;
-      if(diff>20){setTimeout(()=>fireConfetti(diff.toFixed(2)),550);if(navigator.vibrate)navigator.vibrate([40,20,40]);}
-    }else if(diff>=-5){
-      cardCls="warn";
-      badge="👌";
-      title={"lt":"Kainos beveik vienodos","de":"Preise fast gleich","pl":"Ceny prawie takie same"}[lang]||"Almost the same price";
-      hero={"lt":"Skirtumas mažas","de":"Kleiner Unterschied","pl":"Mała różnica"}[lang]||"Small difference";
-      sub=`${_sc.photo_lbl}: ${money(scannedPrice)} · ${_sc.online_lbl}: ${money(bestOnline.price)}`;
-      proof={"lt":"Rinktis pagal patogumą: pristatymą, garantiją ir pirkimo greitį.","de":"Nach Bequemlichkeit entscheiden: Lieferung, Garantie.","pl":"Wybierz według wygody: dostawa, gwarancja."}[lang]||"Decide by convenience: delivery, warranty.";
-      bestColor="var(--amber)";
-    }else{
-      cardCls="bad";
-      badge={"lt":"🏪 TAVO KAINA GERESNĖ","de":"🏪 DEIN PREIS IST BESSER","pl":"🏪 TWOJA CENA LEPSZA"}[lang]||"🏪 YOUR PRICE IS BETTER";
-      title={"lt":"Tavo kaina geresnė! Pirk čia","de":"Dein Preis ist besser! Kauf hier","pl":"Twoja cena lepsza! Kup tutaj"}[lang]||"Your price is better! Buy here";
-      hero=_sc.online_plus+money(Math.abs(diff));
-      sub=`${_sc.photo_lbl}: ${money(scannedPrice)} · ${_sc.online_lbl}: ${money(bestOnline.price)}`;
-      proof={"lt":"Internete brangiau. Jei parduotuvės sąlygos geros — pirkti čia apsimoka.","de":"Online teurer. Wenn die Ladenbedingungen gut sind — hier kaufen lohnt sich.","pl":"Online drożej. Jeśli warunki w sklepie są dobre — warto kupić tutaj."}[lang]||"Online is more expensive. Buy here if store terms are good.";
-      bestColor="var(--red)";
-    }
-
-    html+=`<div class="deal-win-card ${cardCls} fade-up">
-      <div class="deal-badge">${badge}</div>
-      <div class="deal-title">${title}</div>
-      <div class="deal-hero">${hero}</div>
-      <div class="deal-sub">${sub}</div>
-      <div class="deal-metric-grid">
-        <div class="deal-metric">
-          <div class="deal-metric-label">${_sc.photo_lbl}</div>
-          <div class="deal-metric-value">${money(scannedPrice)}</div>
-        </div>
-        <div class="deal-metric">
-          <div class="deal-metric-label">${_sc.online_lbl}</div>
-          <div class="deal-metric-value" style="color:${bestColor}">${money(bestOnline.price)}</div>
-        </div>
-      </div>
-      <div class="deal-proof">${proof}</div>
-    </div>`;
-  }else{
-    const score=d.deal_score||50;
-    if(score>=75&&navigator.vibrate)navigator.vibrate([40,20,40]);
-    const hasAI=!!(d.verdict_reason||d.buy_recommendation);
-    const label=score>=75?"🔥 GOOD DEAL":score>=50?(hasAI?"👌 FAIR DEAL":"📊 MARKET PRICE"):"⚠️ MAYBE WAIT";
-    const title=score>=75
-      ?({"lt":"Rasta gera kaina","de":"Guter Preis gefunden","pl":"Znaleziono dobrą cenę"}[lang]||"Good price found")
-      :score>=50
-        ?(hasAI
-          ?({"lt":"Kaina atrodo normali","de":"Preis sieht fair aus","pl":"Cena wygląda normalnie"}[lang]||"Price looks fair")
-          :({"lt":"Rasta kaina","de":"Preise gefunden","pl":"Znaleziono ceny"}[lang]||"Prices found"))
-      :({"lt":"Kaina neatrodo ypatinga","de":"Preis ist nicht außergewöhnlich","pl":"Cena nie jest wyjątkowa"}[lang]||"Price is not exceptional");
-    const sub=escHtml(d.verdict_reason||d.buy_recommendation||({"lt":"Palyginome kainas iš kelių parduotuvių.","de":"Wir haben Preise aus mehreren Shops verglichen.","pl":"Porównaliśmy ceny z kilku sklepów."}[lang]||"We compared prices across shops."));
-    const cardCls=score>=75?"":score>=50?"warn":"bad";
-    const nOffers=onlineResults.length||results.length;
-    const offersLbl={"lt":nOffers===1?"pasiūlymas":"pasiūlymai","de":nOffers===1?"Angebot":"Angebote","pl":nOffers===1?"oferta":"oferty"}[lang]||"offers";
-    const _bestCardPrice=bestOnline?bestOnline.price:(d.price_min||0);
-    const _bestCardShop=bestOnline?escHtml(bestOnline.shop):"";
-    html+=`<div class="deal-win-card ${cardCls} fade-up">
-      <div class="deal-badge">${label}</div>
-      <div class="deal-title">${title}</div>
-      ${_bestCardPrice>0?`<div class="deal-hero">${money(_bestCardPrice)}</div><div style="font-size:12px;color:var(--ink2);margin:-4px 0 8px;">${_bestCardShop}</div>`:""}
-      <div class="deal-sub">${sub}</div>
-      <div class="mini-score"><span class="mini-score-pill">${nOffers} ${offersLbl}</span></div>
-    </div>`;
-  }
-
-  // Key specs line: product identity confirmation, shown between verdict and shop list
-  // Only when identify-product returned key_specs (photo flow) — never for text searches
-  if(_identifyResult&&_identifyResult.key_specs&&_searchSource==='scan'){
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--r-sm);margin-bottom:10px;font-size:12px;color:var(--ink3);" class="fade-up">📋 <span style="color:var(--ink2);">${escHtml(_identifyResult.key_specs)}</span></div>`;
-  }
-
-  if(d.price_min&&d.price_max&&d.price_max>d.price_min){
-    const spread=d.price_max-d.price_min;
-    const pct=Math.round((spread/d.price_max)*100);
-    const summaryTitle={"lt":"Ką radome","de":"Was wir gefunden haben","pl":"Co znaleźliśmy"}[lang]||"What we found";
-    const lowestLbl={"lt":"Pigiausia","de":"Günstigster","pl":"Najlepsza cena"}[lang]||"Lowest";
-    const highestLbl={"lt":"Brangiausia","de":"Teuerster","pl":"Najwyższa cena"}[lang]||"Highest";
-    const gapLbl={"lt":"Skirtumas","de":"Spanne","pl":"Różnica cen"}[lang]||"Gap";
-    const dotPct=scannedPrice>0?Math.max(0,Math.min(100,Math.round((scannedPrice-d.price_min)/spread*100))):0;
-    html+=`<div class="market-summary win fade-up">
-      <div class="ms-title">${summaryTitle}</div>
-      <div class="ms-row"><span>${lowestLbl}</span><strong>${money(d.price_min)}</strong></div>
-      <div class="ms-row"><span>${highestLbl}</span><strong>${money(d.price_max)}</strong></div>
-      <div class="ms-row"><span>${gapLbl}</span><strong>${money(spread)} · ${pct}%</strong></div>
-      <div class="price-pos-bar"><div class="price-pos-dot" style="left:${dotPct}%"></div></div>
-      <div class="price-pos-labels"><span>${money(d.price_min)}</span><span>${money(d.price_max)}</span></div>
-    </div>`;
-  }
-
-  // AI coach ABOVE price list so users see it before scrolling
-  if(d.ai_summary||d.buy_recommendation){
-    const coachText=d.buy_recommendation||d.ai_summary||"";
-    if(coachText){
-      const coachTitle={"lt":"AI patarimas","de":"KI-Ratschlag","pl":"Porada AI"}[lang]||"AI Shopping Coach";
-      html+=`<div class="coach-card fade-up">
-        <div class="coach-head"><div class="coach-ico">🧠</div><div class="coach-title">${coachTitle}</div></div>
-        <div class="coach-body">${escHtml(coachText)}</div>
-        ${d.alternative?`<div style="margin-top:10px;padding:10px 12px;background:var(--card2);border-radius:var(--r-sm);font-size:12px;color:var(--ink3);">💡 ${{"lt":"Alternatyva","de":"Alternative","pl":"Alternatywa"}[lang]||"Alternative"}: <span style="color:var(--ink);font-weight:700;">${escHtml(d.alternative)}</span></div>`:""}
-      </div>`;
-    }
   }
 
   const offersLbl2={"lt":"Pasiūlymai","de":"Angebote","pl":"Oferty"}[lang]||"Offers";
@@ -2502,14 +2322,14 @@ function renderResults(d,q,opts){opts=opts||{};
     // Savings ribbon: only when >= 2 reliable results exist (no suspicious/accessory items)
     const reliableOnline=onlineResults.filter(r=>!r.is_suspicious&&!r.ai_filtered);
     let saveRibbon="";
-    if(r.is_cheapest&&!r.is_suspicious&&!r.ai_filtered&&!scan&&reliableOnline.length>=2){
+    if(!opts._partial&&r.is_cheapest&&!r.is_suspicious&&!r.ai_filtered&&!scan&&reliableOnline.length>=2){
       const savings=d.price_max-r.price;
       if(savings>=1){
         const saveLbl={"lt":`Sutaupai ${money(savings)}`,"en":`Save ${money(savings)}`,"ru":`Экономия ${money(savings)}`,"de":`${money(savings)} gespart`,"pl":`Oszczędzasz ${money(savings)}`}[lang]||`Save ${money(savings)}`;
         saveRibbon=`<div class="save-ribbon">${saveLbl}</div>`;
       }
     }
-    const winnerCrown=r.is_cheapest&&!r.is_suspicious&&!r.ai_filtered&&!scan&&reliableOnline.length>=2?`<div class="winner-crown">${{"lt":"🏆 Geriausias","en":"🏆 Best deal","ru":"🏆 Лучшее","de":"🏆 Bestes","pl":"🏆 Najlepsze"}[lang]||"🏆 Best deal"}</div>`:"";
+    const winnerCrown=!opts._partial&&r.is_cheapest&&!r.is_suspicious&&!r.ai_filtered&&!scan&&reliableOnline.length>=2?`<div class="winner-crown">${{"lt":"🏆 Geriausias","en":"🏆 Best deal","ru":"🏆 Лучшее","de":"🏆 Bestes","pl":"🏆 Najlepsze"}[lang]||"🏆 Best deal"}</div>`:"";
 
     const overBudget=_budgetMax>0&&r.price>_budgetMax&&!scan;
     html+=`<div class="p-card${best&&!scan?" best":""}${overBudget?" over-budget":""} fade-up" style="animation-delay:${i*0.06}s">
@@ -2554,6 +2374,118 @@ function renderResults(d,q,opts){opts=opts||{};
   }
 
   html += `<div id="price-history-wrap"></div>`;
+
+  // ── BELOW OFFERS: spinner during partial load; analytics when complete ──
+  if(opts._partial){
+    const _searchingLbl={"lt":"Dar ieškome pigiau… palaukite","en":"Still searching for better prices…","de":"Noch günstiger suchen…","pl":"Jeszcze szukamy tańszej ceny…"}[lang]||"Still searching for better prices…";
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--r);margin:8px 0;font-size:13px;color:var(--ink3);">
+      <div style="width:16px;height:16px;border:2px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
+      <span>${_searchingLbl}</span>
+    </div>`;
+  }else{
+    if(d.price_min&&d.price_max&&d.price_max>d.price_min){
+      const spread=d.price_max-d.price_min;
+      const pct=Math.round((spread/d.price_max)*100);
+      const summaryTitle={"lt":"Ką radome","de":"Was wir gefunden haben","pl":"Co znaleźliśmy"}[lang]||"What we found";
+      const lowestLbl={"lt":"Pigiausia","de":"Günstigster","pl":"Najlepsza cena"}[lang]||"Lowest";
+      const highestLbl={"lt":"Brangiausia","de":"Teuerster","pl":"Najwyższa cena"}[lang]||"Highest";
+      const gapLbl={"lt":"Skirtumas","de":"Spanne","pl":"Różnica cen"}[lang]||"Gap";
+      const dotPct=scannedPrice>0?Math.max(0,Math.min(100,Math.round((scannedPrice-d.price_min)/spread*100))):0;
+      html+=`<div class="market-summary win fade-up">
+        <div class="ms-title">${summaryTitle}</div>
+        <div class="ms-row"><span>${lowestLbl}</span><strong>${money(d.price_min)}</strong></div>
+        <div class="ms-row"><span>${highestLbl}</span><strong>${money(d.price_max)}</strong></div>
+        <div class="ms-row"><span>${gapLbl}</span><strong>${money(spread)} · ${pct}%</strong></div>
+        <div class="price-pos-bar"><div class="price-pos-dot" style="left:${dotPct}%"></div></div>
+        <div class="price-pos-labels"><span>${money(d.price_min)}</span><span>${money(d.price_max)}</span></div>
+      </div>`;
+    }
+    if(scannedPrice>1 && bestOnline){
+      const diff=scannedPrice-bestOnline.price;
+      const pct=scannedPrice>0?(diff/scannedPrice*100):0;
+      let cardCls="";let badge="";let title="";let hero="";let sub="";let proof="";let bestColor="var(--green)";
+      const _sc={
+        save:{"lt":"Sutaupoma ","de":"Gespart: ","pl":"Oszczędzasz "}[lang]||"Save ",
+        online_plus:{"lt":"Internete +","de":"Online +","pl":"Online +"}[lang]||"Online +",
+        photo_lbl:{"lt":"Kaina nuotraukoje","de":"Foto-Preis","pl":"Cena ze zdjęcia"}[lang]||"Photo price",
+        online_lbl:{"lt":"Kaina internete","de":"Online-Preis","pl":"Cena online"}[lang]||"Online price",
+      };
+      if(diff>5){
+        badge={"lt":"🌐 PIRK INTERNETE","de":"🌐 ONLINE KAUFEN","pl":"🌐 KUP ONLINE"}[lang]||"🌐 BUY ONLINE";
+        title={"lt":"Pirk internete","de":"Online kaufen","pl":"Kup online"}[lang]||"Buy online";
+        hero=_sc.save+money(diff);
+        sub=`${escHtml(bestOnline.shop)}: ${money(bestOnline.price)} · ${Math.abs(pct).toFixed(0)}% `+({"lt":"pigiau","de":"günstiger","pl":"taniej"}[lang]||"cheaper")+".";
+        proof=`${_sc.photo_lbl}: ${money(scannedPrice)}. ${_sc.online_lbl}: ${money(bestOnline.price)}.`;
+        if(diff>20){setTimeout(()=>fireConfetti(diff.toFixed(2)),550);if(navigator.vibrate)navigator.vibrate([40,20,40]);}
+      }else if(diff>=-5){
+        cardCls="warn";badge="👌";
+        title={"lt":"Kainos beveik vienodos","de":"Preise fast gleich","pl":"Ceny prawie takie same"}[lang]||"Almost the same price";
+        hero={"lt":"Skirtumas mažas","de":"Kleiner Unterschied","pl":"Mała różnica"}[lang]||"Small difference";
+        sub=`${_sc.photo_lbl}: ${money(scannedPrice)} · ${_sc.online_lbl}: ${money(bestOnline.price)}`;
+        proof={"lt":"Rinktis pagal patogumą: pristatymą, garantiją ir pirkimo greitį.","de":"Nach Bequemlichkeit entscheiden: Lieferung, Garantie.","pl":"Wybierz według wygody: dostawa, gwarancja."}[lang]||"Decide by convenience: delivery, warranty.";
+        bestColor="var(--amber)";
+      }else{
+        cardCls="bad";
+        badge={"lt":"🏪 TAVO KAINA GERESNĖ","de":"🏪 DEIN PREIS IST BESSER","pl":"🏪 TWOJA CENA LEPSZA"}[lang]||"🏪 YOUR PRICE IS BETTER";
+        title={"lt":"Tavo kaina geresnė! Pirk čia","de":"Dein Preis ist besser! Kauf hier","pl":"Twoja cena lepsza! Kup tutaj"}[lang]||"Your price is better! Buy here";
+        hero=_sc.online_plus+money(Math.abs(diff));
+        sub=`${_sc.photo_lbl}: ${money(scannedPrice)} · ${_sc.online_lbl}: ${money(bestOnline.price)}`;
+        proof={"lt":"Internete brangiau. Jei parduotuvės sąlygos geros — pirkti čia apsimoka.","de":"Online teurer. Wenn die Ladenbedingungen gut sind — hier kaufen lohnt sich.","pl":"Online drożej. Jeśli warunki w sklepie są dobre — warto kupić tutaj."}[lang]||"Online is more expensive. Buy here if store terms are good.";
+        bestColor="var(--red)";
+      }
+      html+=`<div class="deal-win-card ${cardCls} fade-up">
+        <div class="deal-badge">${badge}</div>
+        <div class="deal-title">${title}</div>
+        <div class="deal-hero">${hero}</div>
+        <div class="deal-sub">${sub}</div>
+        <div class="deal-metric-grid">
+          <div class="deal-metric"><div class="deal-metric-label">${_sc.photo_lbl}</div><div class="deal-metric-value">${money(scannedPrice)}</div></div>
+          <div class="deal-metric"><div class="deal-metric-label">${_sc.online_lbl}</div><div class="deal-metric-value" style="color:${bestColor}">${money(bestOnline.price)}</div></div>
+        </div>
+        <div class="deal-proof">${proof}</div>
+      </div>`;
+    }else{
+      const score=d.deal_score||50;
+      if(score>=75&&navigator.vibrate)navigator.vibrate([40,20,40]);
+      const hasAI=!!(d.verdict_reason||d.buy_recommendation);
+      const label=score>=75?"🔥 GOOD DEAL":score>=50?(hasAI?"👌 FAIR DEAL":"📊 MARKET PRICE"):"⚠️ MAYBE WAIT";
+      const title=score>=75
+        ?({"lt":"Rasta gera kaina","de":"Guter Preis gefunden","pl":"Znaleziono dobrą cenę"}[lang]||"Good price found")
+        :score>=50
+          ?(hasAI
+            ?({"lt":"Kaina atrodo normali","de":"Preis sieht fair aus","pl":"Cena wygląda normalnie"}[lang]||"Price looks fair")
+            :({"lt":"Rasta kaina","de":"Preise gefunden","pl":"Znaleziono ceny"}[lang]||"Prices found"))
+          :({"lt":"Kaina neatrodo ypatinga","de":"Preis ist nicht außergewöhnlich","pl":"Cena nie jest wyjątkowa"}[lang]||"Price is not exceptional");
+      const sub=escHtml(d.verdict_reason||d.buy_recommendation||({"lt":"Palyginome kainas iš kelių parduotuvių.","de":"Wir haben Preise aus mehreren Shops verglichen.","pl":"Porównaliśmy ceny z kilku sklepów."}[lang]||"We compared prices across shops."));
+      const cardCls=score>=75?"":score>=50?"warn":"bad";
+      const nOffers=onlineResults.length||results.length;
+      const offersLbl={"lt":nOffers===1?"pasiūlymas":"pasiūlymai","de":nOffers===1?"Angebot":"Angebote","pl":nOffers===1?"oferta":"oferty"}[lang]||"offers";
+      const _bestCardPrice=bestOnline?bestOnline.price:(d.price_min||0);
+      const _bestCardShop=bestOnline?escHtml(bestOnline.shop):"";
+      html+=`<div class="deal-win-card ${cardCls} fade-up">
+        <div class="deal-badge">${label}</div>
+        <div class="deal-title">${title}</div>
+        ${_bestCardPrice>0?`<div class="deal-hero">${money(_bestCardPrice)}</div><div style="font-size:12px;color:var(--ink2);margin:-4px 0 8px;">${_bestCardShop}</div>`:""}
+        <div class="deal-sub">${sub}</div>
+        <div class="mini-score"><span class="mini-score-pill">${nOffers} ${offersLbl}</span></div>
+      </div>`;
+    }
+    if(_identifyResult&&_identifyResult.key_specs&&_searchSource==='scan'){
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--card2);border:1px solid var(--border2);border-radius:var(--r-sm);margin-bottom:10px;font-size:12px;color:var(--ink3);" class="fade-up">📋 <span style="color:var(--ink2);">${escHtml(_identifyResult.key_specs)}</span></div>`;
+    }
+    if(d.ai_summary||d.buy_recommendation){
+      const coachText=d.buy_recommendation||d.ai_summary||"";
+      if(coachText){
+        const coachTitle={"lt":"AI patarimas","de":"KI-Ratschlag","pl":"Porada AI"}[lang]||"AI Shopping Coach";
+        html+=`<div class="coach-card fade-up">
+          <div class="coach-head"><div class="coach-ico">🧠</div><div class="coach-title">${coachTitle}</div></div>
+          <div class="coach-body">${escHtml(coachText)}</div>
+          ${d.alternative?`<div style="margin-top:10px;padding:10px 12px;background:var(--card2);border-radius:var(--r-sm);font-size:12px;color:var(--ink3);">💡 ${{"lt":"Alternatyva","de":"Alternative","pl":"Alternatywa"}[lang]||"Alternative"}: <span style="color:var(--ink);font-weight:700;">${escHtml(d.alternative)}</span></div>`:""}
+        </div>`;
+      }
+    }
+  }
+
   document.getElementById("res-body").innerHTML=html;
 
   // Animate verdict price counter (0 → price) for premium feel
@@ -3279,7 +3211,6 @@ const LANGS = {
     lowest_price:"Lowest",
     saved_short:"Saved",
     scan_invite:"📷 Photograph",
-    back_to_goody:"Back to Goody",
   },
   lt: {
     scan_hint:"Nufotografuok kainą ir rask pigiau internete",
@@ -3338,7 +3269,6 @@ const LANGS = {
     lowest_price:"Pigiausia",
     saved_short:"Išsaugota",
     scan_invite:"📷 Spustelk fotografuoti",
-    back_to_goody:"Atgal į Goody",
   },
   de: {
     scan_hint:"Kamera auf Preisschild richten — sofort den besten Preis finden",
@@ -3397,7 +3327,6 @@ const LANGS = {
     lowest_price:"Bestpreis",
     saved_short:"Gespeichert",
     scan_invite:"📷 Fotografieren",
-    back_to_goody:"Zurück zu Goody",
   },
   pl: {
     scan_hint:"Skieruj aparat na cenę — znajdź najlepszą ofertę od razu",
@@ -3456,7 +3385,6 @@ const LANGS = {
     lowest_price:"Najtaniej",
     saved_short:"Zapisane",
     scan_invite:"📷 Fotografuj",
-    back_to_goody:"Wróć do Goody",
   }
 };
 let curLang = localStorage.getItem("gy_lang") || (()=>{
