@@ -1174,6 +1174,10 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--ff
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
 <script>
 const API_BASE = "https://goody-backend.onrender.com";
+window.GOODY_API_BASE = API_BASE;
+</script>
+<script src="tracking.js"></script>
+<script>
 
 const CATS = [
   {ic:"📱",lt:"Telefonai",en:"Phones",de:"Handys",pl:"Telefony",q:"iPhone 17 Pro"},
@@ -1892,10 +1896,23 @@ function copyPrice(price){
 
 let _currentSearchId = null;
 
-function trackClick(shop, q){
+function trackClick(shop, q, price, position, isCheapest){
   _haptic([8]);
   sessionStorage.setItem('gy_lastClick', JSON.stringify({shop, q, ts: Date.now()}));
   try{fetch(`${API_BASE}/api/track`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({shop,q,intent_id:_currentSearchId}),keepalive:true});}catch(e){}
+  // Fire no_click suppression signal
+  try{document.dispatchEvent(new Event('goody_offer_click'));}catch(e){}
+  // Intent tracking
+  try{
+    const _canonical=lastData&&lastData.product_name?lastData.product_name.toLowerCase().trim().slice(0,200):null;
+    GoodyTrack.trackEvent('offer_click',{
+      store:shop,
+      price:price||0,
+      position_in_list:position||0,
+      is_cheapest:!!isCheapest,
+      sort_mode:_curSort||'cheapest',
+    },_canonical);
+  }catch(e){}
 }
 
 let _qualityLoop=null,_qualityCount=0;
@@ -1931,9 +1948,12 @@ async function doSearch(){
   if(_activeSearchCtrl){try{_activeSearchCtrl.abort();}catch(e){}}_activeSearchCtrl=null;
   const q=document.getElementById("srch-inp").value.trim();
   if(!q){toast({"lt":"Įveskite produkto pavadinimą","de":"Produktname eingeben","pl":"Wpisz nazwę produktu"}[curLang]||"Enter a product name");return;}
+  const _inputMethod=_searchSource==='scan'?'photo':_searchSource==='barcode_direct'?'barcode':'text';
   if(_searchSource!=='scan')_pendingStorePrice=0;
+  const _skipSearchTrack=_searchSource==='barcode_direct';
   _searchSource='manual';
   lastQ=q;_budgetMax=0;_curSort='cheapest';
+  if(!_skipSearchTrack){try{GoodyTrack.trackEvent('search',{query_raw:q,method:_inputMethod,language:curLang||'lt'});}catch(e){}}
   if(!_skipHistoryPush)history.pushState({q},"","/?q="+encodeURIComponent(q));
   _skipHistoryPush=false;
   navTo("results");
@@ -1998,6 +2018,47 @@ async function doSearch(){
             addToHist(q,msg.payload);
             renderResults(msg.payload,q);
             if(msg.payload._rate)updateRateUI(msg.payload._rate);
+            // ── intent: results_shown ──
+            try{
+              const _d=msg.payload;
+              const _res=(_d.results||[]).filter(r=>r.source!=="scan"&&Number(r.price)>0);
+              const _prices=_res.map(r=>r.price).filter(p=>p>0);
+              const _mn=Math.min(...(_prices.length?_prices:[0]));
+              const _mx=Math.max(...(_prices.length?_prices:[0]));
+              const _canonical=_d.product_name?_d.product_name.toLowerCase().trim().slice(0,200):null;
+              GoodyTrack.trackEvent('results_shown',{
+                offers_count:_res.length,
+                min_price:_mn||null,
+                max_price:_mx||null,
+                price_spread_pct:_mx>0?Math.round((_mx-_mn)/_mx*100):0,
+                stores_responded:(_d.results||[]).map(r=>r.shop).filter((v,i,a)=>a.indexOf(v)===i),
+                stores_failed:[],
+                search_duration_ms:_d.search_time_ms||null,
+              },_canonical);
+            }catch(e){}
+            // ── intent: no_click after 8s ──
+            (function(){
+              var _nc_ts=Date.now();var _nc_q=q;var _nc_d=msg.payload;
+              var _nc_clicked=false;
+              var _nc_handler=function(){_nc_clicked=true;};
+              document.addEventListener('goody_offer_click',_nc_handler,{once:true});
+              setTimeout(function(){
+                document.removeEventListener('goody_offer_click',_nc_handler);
+                if(!_nc_clicked&&lastQ===_nc_q){
+                  try{
+                    var _res2=(_nc_d.results||[]).filter(function(r){return r.source!=='scan'&&Number(r.price)>0;});
+                    var _prices2=_res2.map(function(r){return r.price;}).filter(function(p){return p>0;});
+                    var _mn2=_prices2.length?Math.min.apply(null,_prices2):null;
+                    var _canonical2=_nc_d.product_name?_nc_d.product_name.toLowerCase().trim().slice(0,200):null;
+                    GoodyTrack.trackEvent('no_click',{
+                      offers_count:_res2.length,
+                      min_price:_mn2,
+                      seconds_on_screen:Math.round((Date.now()-_nc_ts)/1000),
+                    },_canonical2);
+                  }catch(e){}
+                }
+              },8000);
+            })();
           }else if(msg.type==="error"&&!gotResult){
             clearInterval(loadTimer);_showSearchError();
           }
@@ -2030,6 +2091,16 @@ async function _doSearchFallback(q){
 function addToHist(q,d){
   const _prevH=hist.find(h=>h.q===q);
   const _prevP=_prevH&&_prevH.price?parseFloat(_prevH.price.replace('€',''))||0:0;
+  // return_visit: if seen >1 day ago, fire event
+  if(_prevH&&_prevH.ts){
+    const _daysSince=Math.floor((Date.now()-_prevH.ts)/86400000);
+    if(_daysSince>=1){
+      try{
+        const _canonical=q?q.toLowerCase().trim().slice(0,200):null;
+        GoodyTrack.trackEvent('return_visit',{days_since_last_seen:_daysSince},_canonical);
+      }catch(e){}
+    }
+  }
   hist=hist.filter(h=>h.q!==q);
   let ic=d&&d.category_icon?d.category_icon:null;
   if(!ic)ic=_getIcon(q)||"🔍";
@@ -2293,7 +2364,7 @@ function renderResults(d,q,opts){opts=opts||{};
     const btnClass=best&&!scan?"buy-link":"view-link";
     const noLinkLbl={"lt":"Nėra nuorodos","de":"Kein Link","pl":"Brak linku"}[lang]||"No link";
     const btnHtml=hasLink
-      ?`<a class="${btnClass}" href="${escHtml(link)}" rel="noopener" onclick="trackClick(${escHtml(JSON.stringify(r.shop))},${escHtml(JSON.stringify(lastQ||q||''))})">${btnLabel}</a>`
+      ?`<a class="${btnClass}" href="${escHtml(link)}" rel="noopener" onclick="trackClick(${escHtml(JSON.stringify(r.shop))},${escHtml(JSON.stringify(lastQ||q||''))},${r.price||0},${i},${!!r.is_cheapest})">${btnLabel}</a>`
       :`<span style="font-size:12px;color:var(--ink3);padding:4px 8px;">${noLinkLbl}</span>`;
     const origPriceHtml=r.original_price?(()=>{
       const sym=r.original_currency==="PLN"?"zł":r.original_currency;
@@ -2778,6 +2849,8 @@ function onBcFound(code){
   setTimeout(()=>{
     closeCam();
     document.getElementById("srch-inp").value=code;
+    try{GoodyTrack.trackEvent('search',{query_raw:code,method:'barcode',language:curLang||'lt'});}catch(e){}
+    _searchSource='barcode_direct';
     doSearch();
   },600);
 }
@@ -3605,6 +3678,14 @@ function toggleWatch(name, price){
       localStorage.setItem(key,JSON.stringify(watches2));
       if(btn){btn.classList.add("active");btn.textContent=watchingLbl;}
       _updateWlBadge();
+      // Intent tracking
+      try{
+        const _canonical=name?name.toLowerCase().trim().slice(0,200):null;
+        GoodyTrack.trackEvent('save_product',{source_screen:'results'},_canonical);
+        if(targetPrice){
+          GoodyTrack.trackEvent('set_alert',{target_price:Number(targetPrice),current_min_price:Number(price)||null},_canonical);
+        }
+      }catch(e){}
       const tMsg=targetPrice?{"lt":`💚 Pranešime kai kaina ≤ €${targetPrice}`,"de":`💚 Benachrichtigung bei ≤ €${targetPrice}`,"pl":`💚 Powiadomimy gdy ≤ €${targetPrice}`}[curLang]||`💚 Alert when ≤ €${targetPrice}`:{"lt":"💚 Pridėta į stebimus!","de":"💚 Zur Beobachtung hinzugefügt!","pl":"💚 Dodano do obserwowanych!"}[curLang]||"💚 Added to watchlist!";
       toast(tMsg);
       if("Notification" in window&&Notification.permission==="default"){setTimeout(()=>Notification.requestPermission(),600);}
