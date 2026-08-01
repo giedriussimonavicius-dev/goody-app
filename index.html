@@ -2034,6 +2034,8 @@ async function doSearch(){
                 stores_responded:(_d.results||[]).map(r=>r.shop).filter((v,i,a)=>a.indexOf(v)===i),
                 stores_failed:[],
                 search_duration_ms:_d.search_time_ms||null,
+                valid_offers:typeof _d.valid_offers==="number"?_d.valid_offers:_res.length,
+                rejected_offers:_d.rejected_offers||0,
               },_canonical);
             }catch(e){}
             // ── intent: no_click after 8s ──
