@@ -3162,10 +3162,33 @@ async function runScan(){
       return;
     }
 
-    // Show "Atpažinta" flash for 1.5s
+    // If product code unverified (hallucination risk) — show warning with editable code field
+    const _isVerified=data.verified!==false;
+    const _hasCode=!!data.scanned_product_code;
+    if(!_isVerified&&_hasCode){
+      const _warnLbl={"lt":"Patikrink modelio numerį","de":"Modellnummer prüfen","pl":"Sprawdź numer modelu"}[curLang]||"Check model number";
+      const _confirmLbl={"lt":"Teisingas, ieškoti →","de":"Richtig, suchen →","pl":"Poprawny, szukaj →"}[curLang]||"Correct, search →";
+      document.getElementById("res-title").textContent=_warnLbl;
+      document.getElementById("res-meta").textContent=_recProduct;
+      document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:20px 12px;"><div style="font-size:40px;margin-bottom:8px;">⚠️</div><div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px;">${escHtml(_recProduct)}</div><div style="background:#FFF3CD;border:1px solid #F0A500;border-radius:10px;padding:14px;margin:14px 0;text-align:left;"><div style="font-size:11px;font-weight:700;color:#7A5C00;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">${escHtml(_warnLbl)}</div><input id="scan-code-field" type="text" value="${escHtml(data.scanned_product_code)}" style="width:100%;padding:10px;font-size:20px;font-weight:800;border:2px solid #F0A500;border-radius:8px;font-family:monospace;box-sizing:border-box;text-align:center;background:#fffbe6;" autocomplete="off"></div><button id="scan-confirm-btn" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;">${escHtml(_confirmLbl)}</button></div>`;
+      const _confirmedCode=await new Promise(res=>{
+        const _doConfirm=()=>{const v=((document.getElementById("scan-code-field")||{}).value||data.scanned_product_code).trim();res(v);};
+        document.getElementById("scan-confirm-btn").onclick=_doConfirm;
+        setTimeout(_doConfirm,10000);
+      });
+      if(_confirmedCode&&_confirmedCode!==data.scanned_product_code){
+        const _corrQ=(data.scanned_brand?data.scanned_brand+" ":"")+_confirmedCode;
+        document.getElementById("srch-inp").value=_corrQ;
+        doSearch();
+        return;
+      }
+    }
+
+    // Show "Atpažinta" flash for 1.5s (verified or no code)
+    const _verifiedIcon=_isVerified||!_hasCode?"✅":"🔍";
     document.getElementById("res-title").textContent={"lt":"Atpažinta","de":"Erkannt","pl":"Rozpoznano"}[curLang]||"Recognized";
     document.getElementById("res-meta").textContent=`${_recProduct} (${_confPct}%)`;
-    document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:32px 0 24px;"><div style="font-size:48px;margin-bottom:12px;">✅</div><div style="font-size:17px;font-weight:800;color:var(--ink);">${escHtml(_recProduct)}</div><div style="font-size:13px;color:var(--ink3);margin-top:6px;">${_confPct}% ${{"lt":"atpažinimo tikslumas","de":"Erkennungsgenauigkeit","pl":"dokładność rozpoznania"}[curLang]||"recognition confidence"}</div><div style="font-size:12px;color:var(--green);margin-top:10px;font-weight:700;">${{"lt":"Ieškome kainų...","de":"Preise werden gesucht...","pl":"Szukamy cen..."}[curLang]||"Searching prices..."}</div></div>`;
+    document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:32px 0 24px;"><div style="font-size:48px;margin-bottom:12px;">${_verifiedIcon}</div><div style="font-size:17px;font-weight:800;color:var(--ink);">${escHtml(_recProduct)}</div><div style="font-size:13px;color:var(--ink3);margin-top:6px;">${_confPct}% ${{"lt":"atpažinimo tikslumas","de":"Erkennungsgenauigkeit","pl":"dokładność rozpoznania"}[curLang]||"recognition confidence"}</div><div style="font-size:12px;color:var(--green);margin-top:10px;font-weight:700;">${{"lt":"Ieškome kainų...","de":"Preise werden gesucht...","pl":"Szukamy cen..."}[curLang]||"Searching prices..."}</div></div>`;
 
     await new Promise(r=>setTimeout(r,1500));
 
