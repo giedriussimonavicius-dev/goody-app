@@ -3095,120 +3095,104 @@ function tryDecImg(dataUrl,b64){
 async function runScan(){
   const btn=document.getElementById("c-snap");btn.disabled=true;
   btn.innerHTML="<span>⏳</span><span>"+( {"lt":"Analizuojama...","de":"Analysiere...","pl":"Analizuję..."}[curLang]||"Analyzing...")+"</span>";
-  // 1. Uždaryti kamerą iš karto
-  closeCam();
-  // 2. Rodyti results puslapį su loading
-  navTo("results");
-  document.getElementById("res-title").textContent={"lt":"Nuskenuojama nuotrauka...","de":"Foto wird gescannt...","pl":"Skanowanie zdjęcia..."}[curLang]||"Scanning photo...";
-  document.getElementById("res-meta").textContent={"lt":"AI atpažįsta produktą...","de":"KI erkennt Produkt...","pl":"AI rozpoznaje produkt..."}[curLang]||"AI identifying product";
-  const scanShops=["Varle.lt","Elesen.lt","Pigu.lt","Topo centras","Senukai.lt","1a.lt","Amazon.DE","Amazon.PL"];
-  let scanIdx=0;
+  closeCam();navTo("results");
+  const _checkingLbl={"lt":"Tikriname parduotuves","de":"Prüfe Shops","pl":"Sprawdzam sklepy"}[curLang]||"Checking stores";
   const skels=[1,2,3].map(()=>`<div class="skel-card"><div class="skel-row"><div class="skel-circle skeleton"></div><div class="skel-lines"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%"></div></div><div class="skel-price skeleton"></div></div></div>`).join("");
-  const _analyzeTitle={"lt":"Analizuojama nuotrauka","de":"Foto wird analysiert","pl":"Analizowanie zdjęcia"}[curLang]||"Analyzing photo";
-  const _analyzeAi={"lt":"AI atpažįsta produktą...","de":"KI erkennt Produkt...","pl":"AI rozpoznaje produkt..."}[curLang]||"AI identifying product...";
-  const _checkingPfx={"lt":"Tikriname","de":"Prüfe","pl":"Sprawdzam"}[curLang]||"Checking";
-  document.getElementById("res-body").innerHTML=`
-    <div style="text-align:center;padding:24px 0 16px;">
-      <div style="font-size:36px;margin-bottom:8px;">📷</div>
-      <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px;">${_analyzeTitle}</div>
-      <div style="font-size:12px;color:var(--ink3);">${_analyzeAi}</div>
-    </div>
-    <div class="shop-status" style="margin-bottom:16px;"><div class="shop-dot"></div><span id="scan-status-txt">🔍 ${_checkingPfx} ${scanShops[0]}...</span></div>
-    ${skels}`;
-  const scanTimer=setInterval(()=>{
-    scanIdx=(scanIdx+1)%scanShops.length;
-    const el=document.getElementById("scan-status-txt");
-    if(el)el.textContent="🔍 "+_checkingPfx+" "+scanShops[scanIdx]+"...";
-  },1200);
+  document.getElementById("res-title").textContent={"lt":"Nuskenuojama...","de":"Scanne...","pl":"Skanuję..."}[curLang]||"Scanning...";
+  document.getElementById("res-meta").textContent={"lt":"AI atpažįsta produktą...","de":"KI erkennt Produkt...","pl":"AI rozpoznaje produkt..."}[curLang]||"Identifying...";
+  document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:32px 0 16px;"><div style="font-size:40px;margin-bottom:10px;">📷</div><div style="font-size:14px;color:var(--ink3);">${{"lt":"Analizuojama nuotrauka…","de":"Foto wird analysiert…","pl":"Analizowanie zdjęcia…"}[curLang]||"Analyzing photo…"}</div></div>${skels}`;
   try{
-    const _sc=new AbortController();const _st=setTimeout(()=>_sc.abort(),90000);
-    const resp=await fetch(`${API_BASE}/api/scan-image`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:capturedB64,language:curLang}),signal:_sc.signal});
-    clearTimeout(_st);clearInterval(scanTimer);
-    const data=await resp.json();
-    // Jei produktas neatpažintas
-    if(data.error==="product_not_recognized"||(!data.scanned_product&&!data.product_name&&!(data.results&&data.results.length))){
-      document.getElementById("res-body").innerHTML=`
-        <div class="no-results">
-          <div class="nr-ico">❌</div>
-          <div class="nr-title">${{"lt":"Neatpažinta","de":"Nicht erkannt","pl":"Nie rozpoznano"}[curLang]||"Not recognized"}</div>
-          <div class="nr-sub">${{"lt":"Nepavyko atpažinti produkto iš nuotraukos.","de":"Produkt konnte aus dem Foto nicht erkannt werden.","pl":"Nie udało się rozpoznać produktu ze zdjęcia."}[curLang]||"Could not identify the product from your photo."}</div>
-          <div style="text-align:left;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin:16px 0;">
-            <div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">💡 <span>${{"lt":"Įsitikink, kad produkto pavadinimas aiškiai matomas","de":"Stelle sicher, dass der Produktname gut sichtbar ist","pl":"Upewnij się, że nazwa produktu jest wyraźnie widoczna"}[curLang]||"Make sure product name/label is clearly visible"}</span></div>
-            <div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">🔆 <span>${{"lt":"Pabandyk geresnį apšvietimą arba priartink kamerą","de":"Versuche bessere Beleuchtung oder näher ran","pl":"Spróbuj lepszego oświetlenia lub zbliż aparat"}[curLang]||"Try better lighting or a closer shot"}</span></div>
-            <div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">✏️ <span>${{"lt":"Arba tiesiog įvesk produkto pavadinimą ranka","de":"Oder tippe einfach den Produktnamen ein","pl":"Albo po prostu wpisz nazwę produktu"}[curLang]||"Or just type the product name below"}</span></div>
-          </div>
-          <button onclick="navTo('home')" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;">← ${{"lt":"Bandyti dar kartą","de":"Erneut versuchen","pl":"Spróbuj ponownie"}[curLang]||"Try again"}</button>
-        </div>`;
+    // ── STEP 1: Vision identification (~3s, vision_only=true) ─────────────────
+    const _sc1=new AbortController();const _st1=setTimeout(()=>_sc1.abort(),30000);
+    const resp1=await fetch(`${API_BASE}/api/scan-image`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:capturedB64,language:curLang,vision_only:true}),signal:_sc1.signal});
+    clearTimeout(_st1);
+    const vd=await resp1.json();
+
+    if(vd.error==="product_not_recognized"||(!vd.product_name&&!vd.product_code)){
+      document.getElementById("res-body").innerHTML=`<div class="no-results"><div class="nr-ico">❌</div><div class="nr-title">${{"lt":"Neatpažinta","de":"Nicht erkannt","pl":"Nie rozpoznano"}[curLang]||"Not recognized"}</div><div class="nr-sub">${{"lt":"Nepavyko atpažinti produkto iš nuotraukos.","de":"Produkt konnte nicht erkannt werden.","pl":"Nie udało się rozpoznać produktu."}[curLang]||"Could not identify the product."}</div><div style="text-align:left;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin:16px 0;"><div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">💡 <span>${{"lt":"Įsitikink, kad produkto pavadinimas aiškiai matomas","de":"Stelle sicher, dass der Produktname gut sichtbar ist","pl":"Upewnij się, że nazwa produktu jest wyraźnie widoczna"}[curLang]||"Make sure product name is clearly visible"}</span></div><div style="font-size:13px;color:var(--ink2);padding:4px 0;display:flex;gap:8px;">🔆 <span>${{"lt":"Pabandyk geresnį apšvietimą arba priartink kamerą","de":"Versuche bessere Beleuchtung oder näher ran","pl":"Spróbuj lepszego oświetlenia lub zbliż aparat"}[curLang]||"Try better lighting or a closer shot"}</span></div></div><button onclick="navTo('home')" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;">← ${{"lt":"Bandyti dar kartą","de":"Erneut versuchen","pl":"Spróbuj ponownie"}[curLang]||"Try again"}</button></div>`;
       document.getElementById("res-title").textContent={"lt":"Neatpažinta","de":"Nicht erkannt","pl":"Nie rozpoznano"}[curLang]||"Not recognized";
       document.getElementById("res-meta").textContent="";
+      btn.disabled=false;btn.style.background="var(--green)";btn.innerHTML="<span>🔍</span><span>"+( {"lt":"Analizuoti AI →","de":"Mit KI analysieren →","pl":"Analizuj z AI →"}[curLang]||"Analyze with AI →")+"</span>";btn.onclick=()=>snapOrSearch();
       return;
     }
-    // Show recognition result briefly before proceeding
-    const _confMap={"high":92,"medium":78,"low":45};
-    const _confPct=_confMap[data.scan_confidence]||75;
-    const _recProduct=data.scanned_product||data.product_name||"";
 
-    // Confidence < 70% (i.e. "low") → ask to retake
-    if(data.scan_confidence==="low"||_confPct<70){
+    const _confMap={"high":92,"medium":78,"low":45};
+    const _confPct=_confMap[vd.confidence]||75;
+    const _recProduct=vd.product_name||vd.product_code||vd.display_name||"";
+    let searchQuery=vd.search_query||vd.display_name||_recProduct;
+
+    // Confidence < 70% → ask to retake
+    if(vd.confidence==="low"||_confPct<70){
       document.getElementById("res-title").textContent={"lt":"Neaiški nuotrauka","de":"Unklares Foto","pl":"Niejasne zdjęcie"}[curLang]||"Unclear photo";
       document.getElementById("res-meta").textContent="";
-      document.getElementById("res-body").innerHTML=`
-        <div class="no-results">
-          <div class="nr-ico">📷</div>
-          <div class="nr-title">${{"lt":"Produktas neatpažintas aiškiai","de":"Produkt nicht klar erkannt","pl":"Produkt nierozpoznany wyraźnie"}[curLang]||"Product not clearly recognized"}</div>
-          <div class="nr-sub">${{"lt":"Tikslumas: "+_confPct+"%. Pabandyk fotografuoti arčiau arba su geresniu apšvietimu.","de":"Genauigkeit: "+_confPct+"%. Näher ran oder bessere Beleuchtung versuchen.","pl":"Dokładność: "+_confPct+"%. Spróbuj bliżej lub przy lepszym oświetleniu."}[curLang]||"Confidence: "+_confPct+"%. Try a closer shot or better lighting."}</div>
-          <button onclick="navTo('home')" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;margin-top:16px;">← ${{"lt":"Fotografuoti iš naujo","de":"Erneut fotografieren","pl":"Zrób zdjęcie ponownie"}[curLang]||"Retake photo"}</button>
-        </div>`;
+      document.getElementById("res-body").innerHTML=`<div class="no-results"><div class="nr-ico">📷</div><div class="nr-title">${{"lt":"Produktas neatpažintas aiškiai","de":"Produkt nicht klar erkannt","pl":"Produkt nierozpoznany wyraźnie"}[curLang]||"Not clearly recognized"}</div><div class="nr-sub">${{"lt":"Tikslumas: "+_confPct+"%. Pabandyk fotografuoti arčiau.","de":"Genauigkeit: "+_confPct+"%. Näher ran versuchen.","pl":"Dokładność: "+_confPct+"%. Spróbuj bliżej."}[curLang]||"Confidence: "+_confPct+"%. Try a closer shot."}</div><button onclick="navTo('home')" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;margin-top:16px;">← ${{"lt":"Fotografuoti iš naujo","de":"Erneut fotografieren","pl":"Zrób zdjęcie ponownie"}[curLang]||"Retake"}</button></div>`;
+      btn.disabled=false;btn.style.background="var(--green)";btn.innerHTML="<span>🔍</span><span>"+( {"lt":"Analizuoti AI →","de":"Mit KI analysieren →","pl":"Analizuj z AI →"}[curLang]||"Analyze with AI →")+"</span>";btn.onclick=()=>snapOrSearch();
       return;
     }
 
-    // If product code unverified (hallucination risk) — show warning with editable code field
-    const _isVerified=data.verified!==false;
-    const _hasCode=!!data.scanned_product_code;
+    // Unverified code → show yellow panel before streaming
+    const _isVerified=vd.verified!==false;
+    const _hasCode=!!vd.product_code;
     if(!_isVerified&&_hasCode){
       const _warnLbl={"lt":"Patikrink modelio numerį","de":"Modellnummer prüfen","pl":"Sprawdź numer modelu"}[curLang]||"Check model number";
       const _confirmLbl={"lt":"Teisingas, ieškoti →","de":"Richtig, suchen →","pl":"Poprawny, szukaj →"}[curLang]||"Correct, search →";
       document.getElementById("res-title").textContent=_warnLbl;
       document.getElementById("res-meta").textContent=_recProduct;
-      document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:20px 12px;"><div style="font-size:40px;margin-bottom:8px;">⚠️</div><div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px;">${escHtml(_recProduct)}</div><div style="background:#FFF3CD;border:1px solid #F0A500;border-radius:10px;padding:14px;margin:14px 0;text-align:left;"><div style="font-size:11px;font-weight:700;color:#7A5C00;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">${escHtml(_warnLbl)}</div><input id="scan-code-field" type="text" value="${escHtml(data.scanned_product_code)}" style="width:100%;padding:10px;font-size:20px;font-weight:800;border:2px solid #F0A500;border-radius:8px;font-family:monospace;box-sizing:border-box;text-align:center;background:#fffbe6;" autocomplete="off"></div><button id="scan-confirm-btn" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;">${escHtml(_confirmLbl)}</button></div>`;
+      document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:20px 12px;"><div style="font-size:40px;margin-bottom:8px;">⚠️</div><div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px;">${escHtml(_recProduct)}</div><div style="background:#FFF3CD;border:1px solid #F0A500;border-radius:10px;padding:14px;margin:14px 0;text-align:left;"><div style="font-size:11px;font-weight:700;color:#7A5C00;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">${escHtml(_warnLbl)}</div><input id="scan-code-field" type="text" value="${escHtml(vd.product_code)}" style="width:100%;padding:10px;font-size:20px;font-weight:800;border:2px solid #F0A500;border-radius:8px;font-family:monospace;box-sizing:border-box;text-align:center;background:#fffbe6;" autocomplete="off"></div><button id="scan-confirm-btn" style="width:100%;padding:14px;background:var(--green);color:#121A24;border:none;border-radius:var(--r);font-family:var(--ff);font-size:15px;font-weight:800;cursor:pointer;">${escHtml(_confirmLbl)}</button></div>`;
       const _confirmedCode=await new Promise(res=>{
-        const _doConfirm=()=>{const v=((document.getElementById("scan-code-field")||{}).value||data.scanned_product_code).trim();res(v);};
-        document.getElementById("scan-confirm-btn").onclick=_doConfirm;
-        setTimeout(_doConfirm,10000);
+        const _do=()=>{const v=((document.getElementById("scan-code-field")||{}).value||vd.product_code).trim();res(v);};
+        document.getElementById("scan-confirm-btn").onclick=_do;
+        setTimeout(_do,10000);
       });
-      if(_confirmedCode&&_confirmedCode!==data.scanned_product_code){
-        const _corrQ=(data.scanned_brand?data.scanned_brand+" ":"")+_confirmedCode;
-        document.getElementById("srch-inp").value=_corrQ;
-        doSearch();
-        return;
+      if(_confirmedCode&&_confirmedCode!==vd.product_code){
+        searchQuery=(vd.brand?vd.brand+" ":"")+_confirmedCode;
       }
     }
 
-    // Show "Atpažinta" flash for 1.5s (verified or no code)
-    const _verifiedIcon=_isVerified||!_hasCode?"✅":"🔍";
+    // Show recognition flash — first result on screen!
+    const _verifiedIcon=(_isVerified||!_hasCode)?"✅":"🔍";
     document.getElementById("res-title").textContent={"lt":"Atpažinta","de":"Erkannt","pl":"Rozpoznano"}[curLang]||"Recognized";
     document.getElementById("res-meta").textContent=`${_recProduct} (${_confPct}%)`;
-    document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:32px 0 24px;"><div style="font-size:48px;margin-bottom:12px;">${_verifiedIcon}</div><div style="font-size:17px;font-weight:800;color:var(--ink);">${escHtml(_recProduct)}</div><div style="font-size:13px;color:var(--ink3);margin-top:6px;">${_confPct}% ${{"lt":"atpažinimo tikslumas","de":"Erkennungsgenauigkeit","pl":"dokładność rozpoznania"}[curLang]||"recognition confidence"}</div><div style="font-size:12px;color:var(--green);margin-top:10px;font-weight:700;">${{"lt":"Ieškome kainų...","de":"Preise werden gesucht...","pl":"Szukamy cen..."}[curLang]||"Searching prices..."}</div></div>`;
+    document.getElementById("res-body").innerHTML=`<div style="text-align:center;padding:24px 0 12px;"><div style="font-size:48px;margin-bottom:10px;">${_verifiedIcon}</div><div style="font-size:17px;font-weight:800;color:var(--ink);">${escHtml(_recProduct)}</div><div style="font-size:13px;color:var(--ink3);margin-top:5px;">${_confPct}%</div></div><div class="shop-status" style="margin:0 0 12px;"><div class="shop-dot"></div><span id="scan-stream-status">${_checkingLbl}…</span></div>${skels}`;
+    document.getElementById("srch-inp").value=searchQuery;
+    if(vd.store_price>0)toast(({"lt":"Kaina parduotuvėje","de":"Ladenpreis","pl":"Cena w sklepie"}[curLang]||"Store price")+`: €${vd.store_price}`);
 
-    await new Promise(r=>setTimeout(r,1500));
-
-    if(data.results&&data.results.length>0){
-      const q=data.scanned_product||data.product_name||"product";
-      document.getElementById("srch-inp").value=q;
-      if(data.store_price)toast(({"lt":"Kaina parduotuvėje","de":"Ladenpreis","pl":"Cena w sklepie"}[curLang]||"Store price")+`: €${data.store_price}`);
-      lastQ=q;lastData=data;
-      addToHist(q,data);
-      renderResults(data,q);
-      navTo("results");
-    } else {
-      const q=data.scanned_product||data.barcode||data.product_name||data.context||"";
-      if(!q){toast({"lt":"Produktas neatpažintas — pabandykite kitą nuotrauką","de":"Produkt nicht erkannt — anderes Foto versuchen","pl":"Nie rozpoznano produktu — spróbuj innego zdjęcia"}[curLang]||"Could not identify product — try another photo");return;}
-      document.getElementById("srch-inp").value=q;
-      if(data.store_price)toast(`${{"lt":"Kaina nuotraukoje","de":"Foto-Preis","pl":"Cena ze zdjęcia"}[curLang]||"Price tag"}: €${data.store_price}`);
-      doSearch();
+    // ── STEP 2: Stream prices progressively ──────────────────────────────────
+    const _sc2=new AbortController();const _st2=setTimeout(()=>_sc2.abort(),30000);
+    const resp2=await fetch(`${API_BASE}/api/search-stream`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:searchQuery,language:curLang,input_method:"scan"}),signal:_sc2.signal});
+    clearTimeout(_st2);
+    if(!resp2.ok||!resp2.body){doSearch();return;}
+    const reader=resp2.body.getReader();const dec=new TextDecoder();
+    let buf="";let lastCompleteData=null;
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      const parts=buf.split("\n\n");buf=parts.pop();
+      for(const part of parts){
+        if(!part.startsWith("data:"))continue;
+        try{
+          const msg=JSON.parse(part.slice(5).trim());
+          if(msg.type==="partial"||msg.type==="complete"){
+            const d=msg.payload;
+            const sd=d._shops_done||0;const st=d._shops_total||3;
+            const stEl=document.getElementById("scan-stream-status");
+            if(stEl)stEl.textContent=_checkingLbl+`: ${sd}/${st}`;
+            if(d.results&&d.results.length>0){
+              renderResults(d,searchQuery,{fetchHistory:false,_partial:msg.type==="partial"});
+            }
+            if(msg.type==="complete"){lastCompleteData=d;}
+          }
+        }catch(e){}
+      }
+    }
+    if(lastCompleteData){
+      lastQ=searchQuery;lastData=lastCompleteData;
+      addToHist(searchQuery,lastCompleteData);
+      document.getElementById("res-title").textContent=searchQuery;
+      document.getElementById("res-meta").textContent="";
     }
   }catch(e){
-    clearInterval(scanTimer);
     btn.disabled=false;btn.style.background="var(--green)";
     btn.innerHTML="<span>🔍</span><span>"+( {"lt":"Analizuoti AI →","de":"Mit KI analysieren →","pl":"Analizuj z AI →"}[curLang]||"Analyze with AI →")+"</span>";btn.onclick=()=>snapOrSearch();
     toast(({"lt":"Klaida: ","de":"Fehler: ","pl":"Błąd: "}[curLang]||"Error: ")+e.message);
